@@ -21,6 +21,8 @@ def read_image(opt):
     x = img.imread('%s%s' % (opt.input_img,opt.ref_image))
     return np2torch(x)
 
+# De-norm and norm will change images
+# between [0, 1] and [-1, 1]
 def denorm(x):
     out = (x + 1) / 2
     return out.clamp(0, 1)
@@ -194,12 +196,18 @@ def save_networks(netG,netD,z,opt):
 
 def adjust_scales2image(real_,opt):
     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
+    # num_scales: how many levels of pyramids
     opt.num_scales = math.ceil((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init))) + 1
+    # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
+    # 1:0; 1/2:1; etc
     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    # stop_scale: level to stop, since reach the maximum size.
     opt.stop_scale = opt.num_scales - scale2stop
+    # scale1: for the largest patch size, what ratio wrt the image shape
     opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
     real = imresize(real_, opt.scale1, opt)
     #opt.scale_factor = math.pow(opt.min_size / (real.shape[2]), 1 / (opt.stop_scale))
+    # TODO: What scale_factor mean
     opt.scale_factor = math.pow(opt.min_size/(min(real.shape[2],real.shape[3])),1/(opt.stop_scale))
     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
     opt.stop_scale = opt.num_scales - scale2stop

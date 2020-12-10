@@ -8,6 +8,18 @@ if __name__ == '__main__':
     parser = get_arguments()
     parser.add_argument('--input_dir', help='input image dir', default='Input/Images')
     parser.add_argument('--input_name', help='input image name', required=True)
+    # Modes including:
+    # train
+    # random_samples
+    # random_samples_arbitrary_sizes
+    # harmonization
+    # editing
+    # SR_train: super resolution train
+    # SR: super resolution
+    # paint_train
+    # paint2image
+    # animation_train
+    # animation
     parser.add_argument('--mode', help='task to be done', default='train')
     opt = parser.parse_args()
     opt = functions.post_config(opt)
@@ -24,7 +36,7 @@ if __name__ == '__main__':
             os.makedirs(dir2save)
         except OSError:
             pass
-        real = functions.read_image(opt)
-        functions.adjust_scales2image(real, opt)
-        train(opt, Gs, Zs, reals, NoiseAmp)
-        SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt)
+    real = functions.read_image(opt)
+    functions.adjust_scales2image(real, opt)
+    train(opt, Gs, Zs, reals, NoiseAmp)
+    SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt)

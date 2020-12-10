@@ -11,15 +11,20 @@ from SinGAN.imresize import imresize
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
     in_s = 0
+    # scale_num: current level from coarest to finest.
     scale_num = 0
+    # scale1: for the largest patch size, what ratio wrt the image shape
     real = imresize(real_,opt.scale1,opt)
     reals = functions.creat_reals_pyramid(real,reals,opt)
     nfc_prev = 0
 
     while scale_num<opt.stop_scale+1:
+        # nfc: number of out channels in conv block
         opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
         opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
 
+        # out_: output directory
+        # outf: output folder, with scale
         opt.out_ = functions.generate_dir2save(opt)
         opt.outf = '%s/%d' % (opt.out_,scale_num)
         try:
@@ -32,6 +37,8 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
+        # TODO:It will load previously trained as the start ckpt. Might add parallelism here.
+        # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
         if (nfc_prev==opt.nfc):
             G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,scale_num-1)))
             D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,scale_num-1)))
@@ -76,6 +83,8 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
 
     alpha = opt.alpha
 
+    # generate_noise(size,num_samp=1,device='cuda',type='gaussian', scale=1)
+    # size: [opt.nc_z, opt.nzx, opt.nzy]
     fixed_noise = functions.generate_noise([opt.nc_z,opt.nzx,opt.nzy],device=opt.device)
     z_opt = torch.full(fixed_noise.shape, 0, device=opt.device)
     z_opt = m_noise(z_opt)
@@ -94,6 +103,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
 
     for epoch in range(opt.niter):
         if (Gs == []) & (opt.mode != 'SR_train'):
+            # Bottom generator
             z_opt = functions.generate_noise([1,opt.nzx,opt.nzy], device=opt.device)
             z_opt = m_noise(z_opt.expand(1,3,opt.nzx,opt.nzy))
             noise_ = functions.generate_noise([1,opt.nzx,opt.nzy], device=opt.device)
