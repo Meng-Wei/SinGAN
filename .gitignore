@@ -3,4 +3,6 @@ Output/
 TrainedModels/
 __pycache__/
 .idea
-*.pyc
+*/*.pyc
+ori_SinGAN
+*.DS_Store
