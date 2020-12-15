@@ -194,10 +194,29 @@ def save_networks(netG,netD,z,opt):
     torch.save(netD.state_dict(), '%s/netD.pth' % (opt.outf))
     torch.save(z, '%s/z_opt.pth' % (opt.outf))
 
+# def adjust_scales2image(real_,opt):
+#     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
+#     # num_scales: how many levels of pyramids
+#     opt.num_scales = math.ceil((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init))) + 1
+#     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
+#     # 1:0; 1/2:1; etc
+#     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+#     # stop_scale: level to stop, since reach the maximum size.
+#     opt.stop_scale = opt.num_scales - scale2stop
+#     # scale1: for the largest patch size, what ratio wrt the image shape
+#     opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
+#     real = imresize(real_, opt.scale1, opt)
+#     #opt.scale_factor = math.pow(opt.min_size / (real.shape[2]), 1 / (opt.stop_scale))
+#     # scale_factor:  evenly divide the scale_factor_init
+#     opt.scale_factor = math.pow(opt.min_size/(min(real.shape[2],real.shape[3])),1/(opt.stop_scale))
+#     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+#     opt.stop_scale = opt.num_scales - scale2stop
+#     return real
+
 def adjust_scales2image(real_,opt):
     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
     # num_scales: how many levels of pyramids
-    opt.num_scales = math.ceil((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init))) + 1
+    opt.num_scales = int((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init)))
     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
     # 1:0; 1/2:1; etc
     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
@@ -206,11 +225,10 @@ def adjust_scales2image(real_,opt):
     # scale1: for the largest patch size, what ratio wrt the image shape
     opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
     real = imresize(real_, opt.scale1, opt)
-    #opt.scale_factor = math.pow(opt.min_size / (real.shape[2]), 1 / (opt.stop_scale))
-    # TODO: What scale_factor mean
-    opt.scale_factor = math.pow(opt.min_size/(min(real.shape[2],real.shape[3])),1/(opt.stop_scale))
-    scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
-    opt.stop_scale = opt.num_scales - scale2stop
+    # scale_factor:  evenly divide the scale_factor_init
+    opt.scale_factor = opt.scale_factor_init
+    # scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    # opt.stop_scale = opt.num_scales - scale2stop
     return real
 
 def adjust_scales2image_SR(real_,opt):
@@ -229,7 +247,7 @@ def adjust_scales2image_SR(real_,opt):
 def creat_reals_pyramid(real,reals,opt):
     real = real[:,0:3,:,:]
     for i in range(0,opt.stop_scale+1,1):
-        scale = math.pow(opt.scale_factor,opt.stop_scale-i)
+        scale = math.pow(opt.scale_factor,opt.num_scales-i)
         curr_real = imresize(real,scale,opt)
         reals.append(curr_real)
     return reals
@@ -339,8 +357,6 @@ def quant2centers(paint, centers):
     #x = x.type(torch.cuda.FloatTensor)
     x = x.view(paint.shape)
     return x
-
-    return paint
 
 
 def dilate_mask(mask,opt):

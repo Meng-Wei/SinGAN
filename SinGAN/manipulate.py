@@ -1,5 +1,5 @@
 from __future__ import print_function
-import SinGAN.functions
+import SinGAN.functions as functions
 import SinGAN.models
 import argparse
 import os

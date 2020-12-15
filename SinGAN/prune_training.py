@@ -4,6 +4,8 @@ import os
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
+import torch.nn.utils.prune as prune
+import torch.nn.functional as F
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
