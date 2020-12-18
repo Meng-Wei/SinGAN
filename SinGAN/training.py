@@ -1,4 +1,4 @@
-# import SinGAN.functions as functions
+import SinGAN.functions as functions
 import SinGAN.models as models
 import os
 import torch.nn as nn
@@ -11,16 +11,6 @@ from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
 
-# Some thoughts:
-# Compare prev with generated image at the current level.
-# Print out discriminator score for a simple real up-sampled picture. (blurred) (not the one downsampled, but the one upsampled from
-# the downsampled image)
-# If the discriminator think this is fake, robust. Make data parallel plausible. (use upsampled downsampled image as the input)
-# The imresize might be too powerful. This model is trying to fill noise to the difference.
-
-
-# TODO: Add minibatch
-batch_size = 5
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -28,7 +18,6 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     # cur_scale_level: current level from coarest to finest.
     cur_scale_level = 0
     # scale1: for the largest patch size, what ratio wrt the image shape
-    # real = imresize(real_,opt.scale1,opt)
     reals = functions.creat_reals_pyramid(real_,reals,opt)
     nfc_prev = 0
 
@@ -52,7 +41,6 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[cur_scale_level]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
-        # TODO:It will load previously trained as the start ckpt. Might add parallelism here.
         # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
         if (nfc_prev==opt.nfc):
             G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)))
@@ -243,12 +231,10 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
             # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
             # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
-            plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
-            plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
-            plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
-            plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
-
-
+            # plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
+            # plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
+            # plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
+            # plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
             torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
 
         schedulerD.step()
@@ -258,7 +244,6 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     return z_opt,in_s,netG    
 
 def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
-    # TODO: Quantization or pruning
     G_z = in_s
     if len(Gs) > 0:
         if mode == 'rand':

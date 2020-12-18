@@ -11,13 +11,6 @@ from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
 
-# Some thoughts:
-# Compare prev with generated image at the current level.
-# Print out discriminator score for a simple real up-sampled picture. (blurred) (not the one downsampled, but the one upsampled from
-# the downsampled image)
-# If the discriminator think this is fake, robust. Make data parallel plausible. (use upsampled downsampled image as the input)
-# The imresize might be too powerful. This model is trying to fill noise to the difference.
-
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -40,7 +33,6 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         diff = (next_img - upsampled_real).abs() - 1 # [-1, 1]
         diffs.append(diff)
 
-    # nfc_prev = 0
     # Train including opt.stop_scale
     while cur_scale_level < opt.stop_scale+1:
         # nfc: number of out channels in conv block
@@ -62,6 +54,8 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
         D_curr,G_curr = init_models(opt)
         # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
+
+        # No need to reload, since training in parallel
         # if (nfc_prev==opt.nfc):
         #     G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)))
         #     D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,cur_scale_level-1)))
@@ -265,7 +259,6 @@ def train_single_scale(netD,netG,reals, upsamples, level,in_s,NoiseAmp,opt,cente
     return z_opt,in_s,netG    
 
 def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
-    # TODO: Quantization or pruning
     G_z = in_s
     if len(Gs) > 0:
         if mode == 'rand':

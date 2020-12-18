@@ -1,9 +1,5 @@
 from config import get_arguments
 from SinGAN.manipulate import *
-# from SinGAN.training import *
-# from SinGAN.pyramid_training import *
-# from SinGAN.prune_training import *
-# from SinGAN.quant_training import *
 import SinGAN.functions as functions
 
 
@@ -15,11 +11,9 @@ if __name__ == '__main__':
     parser.add_argument('--pyramid', action='store_true', 
                         help='training the model to fit the Laplacian Pyramid', default=False)
     parser.add_argument('--quant', action='store_true', 
-                        help='training the model to fit the Laplacian Pyramid', default=False)
-    parser.add_argument('--pyramid', action='store_true', 
-                        help='training the model to fit the Laplacian Pyramid', default=False)
-    parser.add_argument('--pyramid', action='store_true', 
-                        help='training the model to fit the Laplacian Pyramid', default=False)
+                        help='training the model using quantization', default=False)
+    parser.add_argument('--prune', action='store_true', 
+                        help='training the model using pruning', default=False)
     #==========================
     # Modes including:
     # train
@@ -35,6 +29,15 @@ if __name__ == '__main__':
     # animation
     parser.add_argument('--mode', help='task to be done', default='train')
     opt = parser.parse_args()
+    if opt.pyramid:
+        from SinGAN.pyramid_training import *
+    elif opt.quant:
+        from SinGAN.quant_training import *
+    elif opt.prune:
+        from SinGAN.prune_training import *
+    else:
+        from SinGAN.training import *
+
     opt = functions.post_config(opt)
     Gs = []
     Zs = []
@@ -51,5 +54,5 @@ if __name__ == '__main__':
             pass
     real = functions.read_image(opt)
     functions.adjust_scales2image(real, opt)
-    # train(opt, Gs, Zs, reals, NoiseAmp)
+    train(opt, Gs, Zs, reals, NoiseAmp)
     # Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)

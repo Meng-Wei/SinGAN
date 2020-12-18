@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.utils.prune as prune
 import torch.nn.functional as F
+import numpy as np
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
@@ -13,16 +14,6 @@ from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
 
-# Some thoughts:
-# Compare prev with generated image at the current level.
-# Print out discriminator score for a simple real up-sampled picture. (blurred) (not the one downsampled, but the one upsampled from
-# the downsampled image)
-# If the discriminator think this is fake, robust. Make data parallel plausible. (use upsampled downsampled image as the input)
-# The imresize might be too powerful. This model is trying to fill noise to the difference.
-
-
-# TODO: Add minibatch
-batch_size = 5
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -30,7 +21,6 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     # cur_scale_level: current level from coarest to finest.
     cur_scale_level = 0
     # scale1: for the largest patch size, what ratio wrt the image shape
-    # real = imresize(real_,opt.scale1,opt)
     reals = functions.creat_reals_pyramid(real_,reals,opt)
     nfc_prev = 0
 
@@ -54,7 +44,6 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[cur_scale_level]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
-        # TODO:It will load previously trained as the start ckpt. Might add parallelism here.
         # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
         if (nfc_prev==opt.nfc):
             G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)))
@@ -65,15 +54,66 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
         G_curr = functions.reset_grads(G_curr,False)
         G_curr.eval()
-        D_curr = functions.reset_grads(D_curr,False)
-        D_curr.eval()
 
+        #################################################################################
+        # Visualzie weights
+        def visulize_weights(model, fig_name):
+            ori_weights = torch.tensor([]).cuda()
+            for name, m in model.named_parameters():
+                cur_params = m.data.flatten()
+                ori_weights = torch.cat((ori_weights, cur_params))
+            sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
+            print(sparsity)
+            ori_weights = ori_weights.cpu().numpy()
+            ori_weights = plt.hist(ori_weights[ori_weights != 0], bins=100)
+            plt.savefig("%s/%s.png" % (opt.outf, fig_name))
+            plt.close()
+        
+        visulize_weights(G_curr, 'ori')
+
+        # Prune weights
+        modules = [G_curr.head.conv, G_curr.head.norm,
+                   G_curr.body.block1.conv, G_curr.body.block1.norm,
+                   G_curr.body.block2.conv, G_curr.body.block2.norm,
+                   G_curr.body.block3.conv, G_curr.body.block3.norm,
+                   G_curr.tail[0]]
+        parameters_to_prune = (
+            (G_curr.head.conv, 'weight'),
+            (G_curr.head.conv, 'bias'),
+            (G_curr.head.norm, 'weight'),
+            (G_curr.head.norm, 'bias'),
+            (G_curr.body.block1.conv, 'weight'),
+            (G_curr.body.block1.conv, 'bias'),
+            (G_curr.body.block1.norm, 'weight'),
+            (G_curr.body.block1.norm, 'bias'),
+            (G_curr.body.block2.conv, 'weight'),
+            (G_curr.body.block2.conv, 'bias'),
+            (G_curr.body.block2.norm, 'weight'),
+            (G_curr.body.block2.norm, 'bias'),
+            (G_curr.body.block3.conv, 'weight'),
+            (G_curr.body.block3.conv, 'bias'),
+            (G_curr.body.block3.norm, 'weight'),
+            (G_curr.body.block3.norm, 'bias'),
+            (G_curr.tail[0], 'weight'),
+            (G_curr.tail[0], 'bias')
+        )
+        prune.global_unstructured(
+            parameters_to_prune,
+            pruning_method=prune.L1Unstructured,
+            amount=0.2,
+        )
+        for m in modules:
+            prune.remove(m, 'weight')
+            prune.remove(m, 'bias')
+
+        visulize_weights(G_curr, 'prune')
+        #################################################################################
         Gs.append(G_curr)
         Zs.append(z_curr)
         NoiseAmp.append(opt.noise_amp)
 
         torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-        torch.save(Gs, '%s/Gs.pth' % (opt.out_))
+        torch.save(Gs, '%s/pruned_Gs.pth' % (opt.out_))
         torch.save(reals, '%s/reals.pth' % (opt.out_))
         torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
 
@@ -260,7 +300,6 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     return z_opt,in_s,netG    
 
 def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
-    # TODO: Quantization or pruning
     G_z = in_s
     if len(Gs) > 0:
         if mode == 'rand':

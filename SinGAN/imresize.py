@@ -64,7 +64,6 @@ def imresize_to_shape(im,output_shape,opt):
 
 
 def imresize_in(im, scale_factor=None, output_shape=None, kernel=None, antialiasing=True, kernel_shift_flag=False):
-    #TODO: Analyze imresize strategy
     # First standardize values and fill missing arguments (if needed) by deriving scale from output shape or vice versa
     scale_factor, output_shape = fix_scale_and_size(im.shape, output_shape, scale_factor)
 
