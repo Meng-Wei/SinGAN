@@ -7,7 +7,6 @@ import torch.utils.data
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
-# TODO: Add tensorboard
 from torch.utils.tensorboard import SummaryWriter
 import time
 
@@ -182,7 +181,6 @@ def train_single_scale(netD,netG,reals, upsamples, level,in_s,NoiseAmp,opt,cente
                     z_prev = cur_upsample
                     criterion = nn.MSELoss()
                     RMSE = torch.sqrt(criterion(real, z_prev))
-                    # TODO: check paper to see if explained
                     opt.noise_amp = opt.noise_amp_init*RMSE
                     z_prev = m_image(z_prev)
             elif (level != 0):

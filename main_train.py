@@ -12,6 +12,8 @@ if __name__ == '__main__':
                         help='training the model to fit the Laplacian Pyramid', default=False)
     parser.add_argument('--quant', action='store_true', 
                         help='training the model using quantization', default=False)
+    parser.add_argument('--mix', action='store_true', 
+                        help='training the model using quantization', default=False)
     parser.add_argument('--prune', action='store_true', 
                         help='training the model using pruning', default=False)
     #==========================
@@ -35,6 +37,8 @@ if __name__ == '__main__':
         from SinGAN.quant_training import *
     elif opt.prune:
         from SinGAN.prune_training import *
+    elif opt.mix:
+        from SinGAN.mix_training import *
     else:
         from SinGAN.training import *
 

@@ -10,7 +10,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
-# TODO: Add tensorboard
 from torch.utils.tensorboard import SummaryWriter
 import time
 
@@ -57,21 +56,40 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
         #################################################################################
         # Visualzie weights
-        def visulize_weights(model, fig_name):
+        def visualize_weights(modules, fig_name):
             ori_weights = torch.tensor([]).cuda()
-            for name, m in model.named_parameters():
-                cur_params = m.data.flatten()
+            for m in modules:
+                cur_params = m.weight.data.flatten()
                 ori_weights = torch.cat((ori_weights, cur_params))
-            sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
-            print(sparsity)
+                cur_params = m.bias.data.flatten()
+                ori_weights = torch.cat((ori_weights, cur_params))
+            # sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
             ori_weights = ori_weights.cpu().numpy()
             ori_weights = plt.hist(ori_weights[ori_weights != 0], bins=100)
             plt.savefig("%s/%s.png" % (opt.outf, fig_name))
             plt.close()
-        
-        visulize_weights(G_curr, 'ori')
 
-        # Prune weights
+        # Pruning Conv only.
+        # modules = [G_curr.head.conv,
+        #            G_curr.body.block1.conv,
+        #            G_curr.body.block2.conv,
+        #            G_curr.body.block3.conv,
+        #            G_curr.tail[0]]
+
+        # parameters_to_prune = (
+        #     (G_curr.head.conv, 'weight'),
+        #     (G_curr.head.conv, 'bias'),
+        #     (G_curr.body.block1.conv, 'weight'),
+        #     (G_curr.body.block1.conv, 'bias'),
+        #     (G_curr.body.block2.conv, 'weight'),
+        #     (G_curr.body.block2.conv, 'bias'),
+        #     (G_curr.body.block3.conv, 'weight'),
+        #     (G_curr.body.block3.conv, 'bias'),
+        #     (G_curr.tail[0], 'weight'),
+        #     (G_curr.tail[0], 'bias')
+        # )
+
+        # Pruning all weights
         modules = [G_curr.head.conv, G_curr.head.norm,
                    G_curr.body.block1.conv, G_curr.body.block1.norm,
                    G_curr.body.block2.conv, G_curr.body.block2.norm,
@@ -97,16 +115,21 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             (G_curr.tail[0], 'weight'),
             (G_curr.tail[0], 'bias')
         )
+
+        visualize_weights(modules, 'ori')
+
+        # Prune weights
         prune.global_unstructured(
             parameters_to_prune,
             pruning_method=prune.L1Unstructured,
             amount=0.2,
         )
+
         for m in modules:
             prune.remove(m, 'weight')
             prune.remove(m, 'bias')
 
-        visulize_weights(G_curr, 'prune')
+        visualize_weights(modules, 'prune')
         #################################################################################
         Gs.append(G_curr)
         Zs.append(z_curr)
@@ -214,7 +237,6 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                     z_prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rec',m_noise,m_image,opt)
                     criterion = nn.MSELoss()
                     RMSE = torch.sqrt(criterion(real, z_prev))
-                    # TODO: check paper to see if explained
                     opt.noise_amp = opt.noise_amp_init*RMSE
                     z_prev = m_image(z_prev)
             else:

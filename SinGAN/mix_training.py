@@ -4,6 +4,9 @@ import os
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
+import torch.nn.utils.prune as prune
+import torch.nn.functional as F
+import numpy as np
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
@@ -50,15 +53,71 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
         G_curr = functions.reset_grads(G_curr,False)
         G_curr.eval()
-        D_curr = functions.reset_grads(D_curr,False)
-        D_curr.eval()
 
+        #################################################################################
+        # Visualzie weights
+        def visualize_weights(modules, fig_name):
+            ori_weights = torch.tensor([]).cuda()
+            for m in modules:
+                cur_params = m.weight.data.flatten()
+                ori_weights = torch.cat((ori_weights, cur_params))
+                cur_params = m.bias.data.flatten()
+                ori_weights = torch.cat((ori_weights, cur_params))
+            # sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
+            ori_weights = ori_weights.cpu().numpy()
+            ori_weights = plt.hist(ori_weights[ori_weights != 0], bins=100)
+            plt.savefig("%s/%s.png" % (opt.outf, fig_name))
+            plt.close()
+
+        # Pruning all weights
+        modules = [G_curr.head.conv, G_curr.head.norm,
+                   G_curr.body.block1.conv, G_curr.body.block1.norm,
+                   G_curr.body.block2.conv, G_curr.body.block2.norm,
+                   G_curr.body.block3.conv, G_curr.body.block3.norm,
+                   G_curr.tail[0]]
+        parameters_to_prune = (
+            (G_curr.head.conv, 'weight'),
+            (G_curr.head.conv, 'bias'),
+            (G_curr.head.norm, 'weight'),
+            (G_curr.head.norm, 'bias'),
+            (G_curr.body.block1.conv, 'weight'),
+            (G_curr.body.block1.conv, 'bias'),
+            (G_curr.body.block1.norm, 'weight'),
+            (G_curr.body.block1.norm, 'bias'),
+            (G_curr.body.block2.conv, 'weight'),
+            (G_curr.body.block2.conv, 'bias'),
+            (G_curr.body.block2.norm, 'weight'),
+            (G_curr.body.block2.norm, 'bias'),
+            (G_curr.body.block3.conv, 'weight'),
+            (G_curr.body.block3.conv, 'bias'),
+            (G_curr.body.block3.norm, 'weight'),
+            (G_curr.body.block3.norm, 'bias'),
+            (G_curr.tail[0], 'weight'),
+            (G_curr.tail[0], 'bias')
+        )
+
+        visualize_weights(modules, 'ori')
+
+        # Prune weights
+        prune.global_unstructured(
+            parameters_to_prune,
+            pruning_method=prune.L1Unstructured,
+            amount=0.2,
+        )
+
+        for m in modules:
+            prune.remove(m, 'weight')
+            prune.remove(m, 'bias')
+
+        visualize_weights(modules, 'prune')
+        G_curr.half()
+        #################################################################################
         Gs.append(G_curr)
         Zs.append(z_curr)
         NoiseAmp.append(opt.noise_amp)
 
         torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-        torch.save(Gs, '%s/Gs.pth' % (opt.out_))
+        torch.save(Gs, '%s/pruned_Gs.pth' % (opt.out_))
         torch.save(reals, '%s/reals.pth' % (opt.out_))
         torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
 
@@ -222,6 +281,13 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             total_time = time.time() - start_time
             start_time = time.time()
             print('scale %d:[%d/%d], total time: %f' % (len(Gs), epoch, opt.niter, total_time))
+            memory = torch.cuda.memory_allocated()
+            print('allocated memory: %dG %dM %dk %d' % 
+                    ( memory // (1024*1024*1024), 
+                      (memory // (1024*1024)) % 1024,
+                      (memory // 1024) % 1024,
+                      memory % 1024 ))
+            print('allocated memory: %.03f GB' % (memory / (1024*1024*1024*1.0) ))
 
         # if epoch % 500 == 0 or epoch == (opt.niter-1):
         if epoch == (opt.niter-1):
@@ -230,9 +296,9 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
             # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
             # plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
-            # plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
-            # plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
-            # plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
+            plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
+            plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
+            plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
             torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
 
         schedulerD.step()
@@ -261,7 +327,7 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = G_z[:,:,0:real_curr.shape[2],0:real_curr.shape[3]]
                 G_z = m_image(G_z)
                 z_in = noise_amp*z+G_z
-                G_z = G(z_in.detach(),G_z)
+                G_z = G(z_in.half().detach(),G_z.half())
                 G_z = imresize(G_z,1/opt.scale_factor,opt)
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 count += 1
@@ -271,7 +337,7 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = G_z[:, :, 0:real_curr.shape[2], 0:real_curr.shape[3]]
                 G_z = m_image(G_z)
                 z_in = noise_amp*Z_opt+G_z
-                G_z = G(z_in.detach(),G_z)
+                G_z = G(z_in.half().detach(),G_z.half())
                 G_z = imresize(G_z,1/opt.scale_factor,opt)
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 #if count != (len(Gs)-1):

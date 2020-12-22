@@ -1,5 +1,6 @@
 import SinGAN.functions as functions
-import SinGAN.models_quant as models
+import SinGAN.models as models
+# import SinGAN.models_quant as models
 import os
 import torch.nn as nn
 import torch.optim as optim
@@ -7,7 +8,6 @@ import torch.utils.data
 import math
 import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
-# TODO: Add tensorboard
 from torch.utils.tensorboard import SummaryWriter
 import time
 
@@ -53,7 +53,9 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         G_curr.eval()
         D_curr = functions.reset_grads(D_curr,False)
         D_curr.eval()
-
+        #===========================================================================
+        G_curr.half()
+        #===========================================================================
         Gs.append(G_curr)
         Zs.append(z_curr)
         NoiseAmp.append(opt.noise_amp)
@@ -223,6 +225,13 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             total_time = time.time() - start_time
             start_time = time.time()
             print('scale %d:[%d/%d], total time: %f' % (len(Gs), epoch, opt.niter, total_time))
+            memory = torch.cuda.memory_allocated()
+            print('allocated memory: %dG %dM %dk %d' % 
+                    ( memory // (1024*1024*1024), 
+                      (memory // (1024*1024)) % 1024,
+                      (memory // 1024) % 1024,
+                      memory % 1024 ))
+            print('allocated memory: %.03f GB' % (memory / (1024*1024*1024*1.0) ))
 
         # if epoch % 500 == 0 or epoch == (opt.niter-1):
         if epoch == (opt.niter-1):
@@ -231,9 +240,9 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
             # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
             # plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
-            # plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
-            # plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
-            # plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
+            plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
+            plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
+            plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
             torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
 
         schedulerD.step()
@@ -262,7 +271,7 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = G_z[:,:,0:real_curr.shape[2],0:real_curr.shape[3]]
                 G_z = m_image(G_z)
                 z_in = noise_amp*z+G_z
-                G_z = G(z_in.detach(),G_z)
+                G_z = G(z_in.half().detach(),G_z.half())
                 G_z = imresize(G_z,1/opt.scale_factor,opt)
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 count += 1
@@ -272,7 +281,7 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = G_z[:, :, 0:real_curr.shape[2], 0:real_curr.shape[3]]
                 G_z = m_image(G_z)
                 z_in = noise_amp*Z_opt+G_z
-                G_z = G(z_in.detach(),G_z)
+                G_z = G(z_in.half().detach(),G_z.half())
                 G_z = imresize(G_z,1/opt.scale_factor,opt)
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 #if count != (len(Gs)-1):

@@ -172,6 +172,8 @@ def np2torch(x,opt):
     if not(opt.not_cuda):
         x = move_to_gpu(x)
     x = x.type(torch.cuda.FloatTensor) if not(opt.not_cuda) else x.type(torch.FloatTensor)
+    # if opt.quant:
+    #     x = x.half()
     #x = x.type(torch.FloatTensor)
     x = norm(x)
     return x
@@ -261,10 +263,16 @@ def load_trained_pyramid(opt, mode_='train'):
         opt.mode = mode
     dir = generate_dir2save(opt)
     if(os.path.exists(dir)):
-        Gs = torch.load('%s/Gs.pth' % dir)
-        Zs = torch.load('%s/Zs.pth' % dir)
-        reals = torch.load('%s/reals.pth' % dir)
-        NoiseAmp = torch.load('%s/NoiseAmp.pth' % dir)
+        if opt.not_cuda:
+            Gs = torch.load('%s/Gs.pth' % dir,map_location=torch.device('cpu') )
+            Zs = torch.load('%s/Zs.pth' % dir,map_location=torch.device('cpu') )
+            reals = torch.load('%s/reals.pth' % dir,map_location=torch.device('cpu') )
+            NoiseAmp = torch.load('%s/NoiseAmp.pth' % dir,map_location=torch.device('cpu') )
+        else:
+            Gs = torch.load('%s/Gs.pth' % dir)
+            Zs = torch.load('%s/Zs.pth' % dir)
+            reals = torch.load('%s/reals.pth' % dir)
+            NoiseAmp = torch.load('%s/NoiseAmp.pth' % dir)
     else:
         print('no appropriate trained model is exist, please train first')
     opt.mode = mode
