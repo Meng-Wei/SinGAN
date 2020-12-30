@@ -68,6 +68,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         cur_scale_level+=1
         nfc_prev = opt.nfc
         del D_curr,G_curr
+        torch.cuda.empty_cache()
     return
 
 
@@ -221,16 +222,16 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         D_fake2plot.append(D_G_z)
         z_opt2plot.append(rec_loss)
 
-        if epoch % 100 == 0 or epoch == (opt.niter-1):
+        if epoch > 1 and (epoch % 100 == 0 or epoch == (opt.niter-1)):
             total_time = time.time() - start_time
             start_time = time.time()
             print('scale %d:[%d/%d], total time: %f' % (len(Gs), epoch, opt.niter, total_time))
-            memory = torch.cuda.memory_allocated()
-            print('allocated memory: %dG %dM %dk %d' % 
-                    ( memory // (1024*1024*1024), 
-                      (memory // (1024*1024)) % 1024,
-                      (memory // 1024) % 1024,
-                      memory % 1024 ))
+            memory = torch.cuda.max_memory_allocated()
+            # print('allocated memory: %dG %dM %dk %d' % 
+            #         ( memory // (1024*1024*1024), 
+            #           (memory // (1024*1024)) % 1024,
+            #           (memory // 1024) % 1024,
+            #           memory % 1024 ))
             print('allocated memory: %.03f GB' % (memory / (1024*1024*1024*1.0) ))
 
         # if epoch % 500 == 0 or epoch == (opt.niter-1):

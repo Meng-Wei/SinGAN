@@ -60,3 +60,7 @@ if __name__ == '__main__':
     functions.adjust_scales2image(real, opt)
     train(opt, Gs, Zs, reals, NoiseAmp)
     # Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
+    # torch.cuda.reset_max_memory_allocated()
+    # memory = torch.cuda.max_memory_allocated()
+    # SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, gen_start_scale=0)
+    # print('allocated memory: %.03f GB' % (memory / (1024*1024*1024*1.0) ))
