@@ -12,7 +12,17 @@ import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
+from SinGAN.manipulate import SinGAN_generate
 
+# Some pruning parameters
+structured = True
+fine_tune = True
+
+if structured:
+    warmup_steps = 100
+else:
+    warmup_steps = 1000
+pruning_amount = 0.9
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -49,10 +59,12 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,cur_scale_level-1)))
 
         # in_s: guess: initial signal? it doesn't change during the training, and is a zero tensor.
-        z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt)
+        z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, warmup_steps)
 
         G_curr = functions.reset_grads(G_curr,False)
+        # D_curr = functions.reset_grads(D_curr,False)
         G_curr.eval()
+        # D_curr.eval()
 
         #################################################################################
         # Visualzie weights
@@ -61,75 +73,102 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             for m in modules:
                 cur_params = m.weight.data.flatten()
                 ori_weights = torch.cat((ori_weights, cur_params))
-                cur_params = m.bias.data.flatten()
-                ori_weights = torch.cat((ori_weights, cur_params))
-            # sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
+                # cur_params = m.bias.data.flatten()
+                # ori_weights = torch.cat((ori_weights, cur_params))
+            sparsity = torch.sum(ori_weights == 0) * 1.0 / (ori_weights.nelement())
+            print(sparsity, ori_weights.nelement())
             ori_weights = ori_weights.cpu().numpy()
             ori_weights = plt.hist(ori_weights[ori_weights != 0], bins=100)
             plt.savefig("%s/%s.png" % (opt.outf, fig_name))
             plt.close()
 
-        # Pruning Conv only.
-        # modules = [G_curr.head.conv,
-        #            G_curr.body.block1.conv,
-        #            G_curr.body.block2.conv,
-        #            G_curr.body.block3.conv,
-        #            G_curr.tail[0]]
+        # Pruning weights Structured or Non-structured
+        if not structured:
+            modules = [G_curr.head.conv, G_curr.head.norm,
+                    G_curr.body.block1.conv, G_curr.body.block1.norm,
+                    G_curr.body.block2.conv, G_curr.body.block2.norm,
+                    G_curr.body.block3.conv, G_curr.body.block3.norm,
+                    G_curr.tail[0]]
+            parameters_to_prune = (
+                (G_curr.head.conv, 'weight'),
+                (G_curr.head.norm, 'weight'),
+                (G_curr.body.block1.conv, 'weight'),
+                (G_curr.body.block1.norm, 'weight'),
+                (G_curr.body.block2.conv, 'weight'),
+                (G_curr.body.block2.norm, 'weight'),
+                (G_curr.body.block3.conv, 'weight'),
+                (G_curr.body.block3.norm, 'weight'),
+                (G_curr.tail[0], 'weight'),
+                (G_curr.head.conv, 'bias'),
+                (G_curr.head.norm, 'bias'),
+                (G_curr.body.block1.conv, 'bias'),
+                (G_curr.body.block1.norm, 'bias'),
+                (G_curr.body.block2.conv, 'bias'),
+                (G_curr.body.block2.norm, 'bias'),
+                (G_curr.body.block3.conv, 'bias'),
+                (G_curr.body.block3.norm, 'bias'),
+                (G_curr.tail[0], 'bias'),
+            )
 
-        # parameters_to_prune = (
-        #     (G_curr.head.conv, 'weight'),
-        #     (G_curr.head.conv, 'bias'),
-        #     (G_curr.body.block1.conv, 'weight'),
-        #     (G_curr.body.block1.conv, 'bias'),
-        #     (G_curr.body.block2.conv, 'weight'),
-        #     (G_curr.body.block2.conv, 'bias'),
-        #     (G_curr.body.block3.conv, 'weight'),
-        #     (G_curr.body.block3.conv, 'bias'),
-        #     (G_curr.tail[0], 'weight'),
-        #     (G_curr.tail[0], 'bias')
-        # )
+            visualize_weights(modules, 'ori')
 
-        # Pruning all weights
-        modules = [G_curr.head.conv, G_curr.head.norm,
-                   G_curr.body.block1.conv, G_curr.body.block1.norm,
-                   G_curr.body.block2.conv, G_curr.body.block2.norm,
-                   G_curr.body.block3.conv, G_curr.body.block3.norm,
-                   G_curr.tail[0]]
-        parameters_to_prune = (
-            (G_curr.head.conv, 'weight'),
-            (G_curr.head.conv, 'bias'),
-            (G_curr.head.norm, 'weight'),
-            (G_curr.head.norm, 'bias'),
-            (G_curr.body.block1.conv, 'weight'),
-            (G_curr.body.block1.conv, 'bias'),
-            (G_curr.body.block1.norm, 'weight'),
-            (G_curr.body.block1.norm, 'bias'),
-            (G_curr.body.block2.conv, 'weight'),
-            (G_curr.body.block2.conv, 'bias'),
-            (G_curr.body.block2.norm, 'weight'),
-            (G_curr.body.block2.norm, 'bias'),
-            (G_curr.body.block3.conv, 'weight'),
-            (G_curr.body.block3.conv, 'bias'),
-            (G_curr.body.block3.norm, 'weight'),
-            (G_curr.body.block3.norm, 'bias'),
-            (G_curr.tail[0], 'weight'),
-            (G_curr.tail[0], 'bias')
-        )
+            # Prune weights
+            prune.global_unstructured(
+                parameters_to_prune,
+                pruning_method=prune.L1Unstructured,
+                amount=pruning_amount,
+            )
+        else:
+            modules = [G_curr.head.conv,
+            G_curr.body.block1.conv,
+            G_curr.body.block2.conv,
+            G_curr.body.block3.conv]
 
-        visualize_weights(modules, 'ori')
+            visualize_weights(modules, 'ori')
+            # pytorch_total_params = sum(p.numel() for p in G_curr.parameters())
+            # print(pytorch_total_params)
 
-        # Prune weights
-        prune.global_unstructured(
-            parameters_to_prune,
-            pruning_method=prune.L1Unstructured,
-            amount=0.2,
-        )
+            for module in modules:
+                m = prune.ln_structured(module, name="weight", amount=pruning_amount, n=1, dim=0)
+                # m = prune.ln_structured(module, name="bias", amount=pruning_amount, n=1, dim=0)
+
+        torch.save(G_curr.state_dict(), '%s/raw_prune_netG.pth' % (opt.outf))
+        visualize_weights(modules, 'raw-prune')
+        if cur_scale_level > 0:
+            fake_Gs = Gs.copy()
+            fake_Gs.append(G_curr) 
+            fake_Zs = Zs.copy()
+            fake_Zs.append(z_curr)
+            fake_noise = NoiseAmp.copy()
+            fake_noise.append(opt.noise_amp)
+            fake_reals = reals[:cur_scale_level+1].copy()
+            SinGAN_generate(fake_Gs, fake_Zs, fake_reals, fake_noise, opt, gen_start_scale=0, num_samples=2)
+
+        # Fine-tuning
+        if fine_tune:
+            G_curr = functions.reset_grads(G_curr, True)
+            G_curr.train()
+
+            if not structured:
+                # Keep training using inherited weights
+                z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, opt.niter - warmup_steps, prune=True)
+            else:
+                # Training from scratch
+                # G_curr.apply(models.weights_init)
+                # D_curr.apply(models.weights_init)
+                z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, opt.niter, prune=True)
+        G_curr = functions.reset_grads(G_curr,False)
+        G_curr.eval()
+        visualize_weights(modules, 'fine-tune')
 
         for m in modules:
             prune.remove(m, 'weight')
-            prune.remove(m, 'bias')
+            if not structured:
+                prune.remove(m, 'bias')
 
-        visualize_weights(modules, 'prune')
+        # pytorch_total_params = sum(p.numel() for p in G_curr.parameters())
+        # print(pytorch_total_params)
+
         #################################################################################
         Gs.append(G_curr)
         Zs.append(z_curr)
@@ -147,7 +186,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
 
 
-def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
+def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,steps,centers=None, prune=False):
 
     real = reals[len(Gs)]
     opt.nzx = real.shape[2]#+(opt.ker_size-1)*(opt.num_layer)
@@ -155,10 +194,6 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     opt.receptive_field = opt.ker_size + ((opt.ker_size-1)*(opt.num_layer-1))*opt.stride
     pad_noise = int(((opt.ker_size - 1) * opt.num_layer) / 2)
     pad_image = int(((opt.ker_size - 1) * opt.num_layer) / 2)
-    if opt.mode == 'animation_train':
-        opt.nzx = real.shape[2]+(opt.ker_size-1)*(opt.num_layer)
-        opt.nzy = real.shape[3]+(opt.ker_size-1)*(opt.num_layer)
-        pad_noise = 0
     m_noise = nn.ZeroPad2d(int(pad_noise))
     m_image = nn.ZeroPad2d(int(pad_image))
 
@@ -184,7 +219,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     D_fake2plot = []
     z_opt2plot = []
 
-    for epoch in range(opt.niter):
+    for epoch in range(steps):
         start_time = time.time()
         if (Gs == []) & (opt.mode != 'SR_train'):
             # Bottom generator, here without zero init
@@ -296,29 +331,48 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         D_fake2plot.append(D_G_z)
         z_opt2plot.append(rec_loss)
 
-        if epoch % 100 == 0 or epoch == (opt.niter-1):
+        if epoch > 1 and (epoch % 100 == 0 or epoch == (steps-1)):
             total_time = time.time() - start_time
             start_time = time.time()
             print('scale %d:[%d/%d], total time: %f' % (len(Gs), epoch, opt.niter, total_time))
+            memory = torch.cuda.max_memory_allocated()
+            # print('allocated memory: %dG %dM %dk %d' % 
+            #         ( memory // (1024*1024*1024), 
+            #           (memory // (1024*1024)) % 1024,
+            #           (memory // 1024) % 1024,
+            #           memory % 1024 ))
+            print('allocated memory: %.03f GB' % (memory / (1024*1024*1024*1.0) ))
 
-        # if epoch % 500 == 0 or epoch == (opt.niter-1):
-        if epoch == (opt.niter-1):
-            plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
-            plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
-            # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
-            # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
-            plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
-            plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
-            plt.imsave('%s/prev_plus_noise.png'    %  (opt.outf), functions.convert_image_np(noise), vmin=0, vmax=1)
-            plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
-
+        if epoch > 1 and (epoch % 500 == 0 or epoch == (steps-1)):
+            if not prune:
+                plt.imsave('%s/fake_sample%d.png' %  (opt.outf, steps), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
+                plt.imsave('%s/G(z_opt)%d.png'    % (opt.outf, steps),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
+                plt.imsave('%s/prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
+                plt.plot(np.arange(epoch+1), errG2plot, label='errG')
+                plt.plot(np.arange(epoch+1), D_real2plot, label='D_real')
+                plt.plot(np.arange(epoch+1), D_fake2plot, label='D_fake')
+                plt.legend(loc="best")
+                plt.savefig('%s/error.png' % (opt.outf))
+                plt.close()
+            else:
+                plt.imsave('%s/prune_fake_sample%d.png' %  (opt.outf, steps), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
+                plt.imsave('%s/prune_G(z_opt)%d.png'    % (opt.outf, steps),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
+                plt.imsave('%s/prune_prev.png'     %  (opt.outf), functions.convert_image_np(prev), vmin=0, vmax=1)
+                plt.plot(np.arange(epoch+1), errG2plot, label='errG')
+                plt.plot(np.arange(epoch+1), D_real2plot, label='D_real')
+                plt.plot(np.arange(epoch+1), D_fake2plot, label='D_fake')
+                plt.legend(loc="best")
+                plt.savefig('%s/prune_error.png' % (opt.outf))
+                plt.close()
 
             torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
 
         schedulerD.step()
         schedulerG.step()
-
-    functions.save_networks(netG,netD,z_opt,opt)
+    if not prune:
+        functions.save_networks(netG,netD,z_opt,opt)
+    else:
+        torch.save(netG.state_dict(), '%s/fine_tune_netG.pth' % (opt.outf))
     return z_opt,in_s,netG    
 
 def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
@@ -358,55 +412,6 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 #    G_z = m_image(G_z)
                 count += 1
     return G_z
-
-def train_paint(opt,Gs,Zs,reals,NoiseAmp,centers,paint_inject_scale):
-    in_s = torch.full(reals[0].shape, 0, device=opt.device)
-    cur_scale_level = 0
-    nfc_prev = 0
-
-    while cur_scale_level<opt.stop_scale+1:
-        if cur_scale_level!=paint_inject_scale:
-            cur_scale_level += 1
-            nfc_prev = opt.nfc
-            continue
-        else:
-            opt.nfc = min(opt.nfc_init * pow(2, math.floor(cur_scale_level / 4)), 128)
-            opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(cur_scale_level / 4)), 128)
-
-            opt.out_ = functions.generate_dir2save(opt)
-            opt.outf = '%s/%d' % (opt.out_,cur_scale_level)
-            try:
-                os.makedirs(opt.outf)
-            except OSError:
-                    pass
-
-            #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
-            #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
-            plt.imsave('%s/in_scale.png' %  (opt.outf), functions.convert_image_np(reals[cur_scale_level]), vmin=0, vmax=1)
-
-            D_curr,G_curr = init_models(opt)
-
-            z_curr,in_s,G_curr = train_single_scale(D_curr,G_curr,reals[:cur_scale_level+1],Gs[:cur_scale_level],Zs[:cur_scale_level],in_s,NoiseAmp[:cur_scale_level],opt,centers=centers)
-
-            G_curr = functions.reset_grads(G_curr,False)
-            G_curr.eval()
-            D_curr = functions.reset_grads(D_curr,False)
-            D_curr.eval()
-
-            Gs[cur_scale_level] = G_curr
-            Zs[cur_scale_level] = z_curr
-            NoiseAmp[cur_scale_level] = opt.noise_amp
-
-            torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-            torch.save(Gs, '%s/Gs.pth' % (opt.out_))
-            torch.save(reals, '%s/reals.pth' % (opt.out_))
-            torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
-
-            cur_scale_level+=1
-            nfc_prev = opt.nfc
-        del D_curr,G_curr
-    return
-
 
 def init_models(opt):
 

@@ -44,6 +44,8 @@ import numpy
 import scipy
 import pickle
 
+# python sifid_score.py --path2real --path2fake -c --images_suffix jpg
+
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('--path2real', type=str, help=('Path to the real images'))
 parser.add_argument('--path2fake', type=str, help=('Path to generated images'))
