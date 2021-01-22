@@ -12,17 +12,17 @@ import matplotlib.pyplot as plt
 from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
-from SinGAN.manipulate import SinGAN_generate
+from SinGAN.manipulate import prune_SinGAN_generate
 
 # Some pruning parameters
-structured = True
-fine_tune = True
+structured = False
+fine_tune = False
 
 if structured:
     warmup_steps = 100
 else:
     warmup_steps = 1000
-pruning_amount = 0.9
+pruning_amount = 0.5
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -59,7 +59,11 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,cur_scale_level-1)))
 
         # in_s: guess: initial signal? it doesn't change during the training, and is a zero tensor.
-        z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, warmup_steps)
+        if fine_tune:
+          z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, warmup_steps)
+        else:
+          z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt, opt.niter)
+
 
         G_curr = functions.reset_grads(G_curr,False)
         # D_curr = functions.reset_grads(D_curr,False)
@@ -142,7 +146,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             fake_noise = NoiseAmp.copy()
             fake_noise.append(opt.noise_amp)
             fake_reals = reals[:cur_scale_level+1].copy()
-            SinGAN_generate(fake_Gs, fake_Zs, fake_reals, fake_noise, opt, gen_start_scale=0, num_samples=2)
+            prune_SinGAN_generate(fake_Gs, fake_Zs, fake_reals, fake_noise, opt, gen_start_scale=0, num_samples=1, level=cur_scale_level)
 
         # Fine-tuning
         if fine_tune:
@@ -164,8 +168,8 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         for m in modules:
             prune.remove(m, 'weight')
             if not structured:
-                prune.remove(m, 'bias')
-
+              prune.remove(m, 'bias')
+        
         # pytorch_total_params = sum(p.numel() for p in G_curr.parameters())
         # print(pytorch_total_params)
 

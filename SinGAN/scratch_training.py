@@ -10,6 +10,7 @@ from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
 
+new_nfc = 16
 
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
@@ -38,8 +39,11 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
         #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
         plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[cur_scale_level]), vmin=0, vmax=1)
-
-        D_curr,G_curr = init_models(opt)
+        import copy
+        new_opt = copy.deepcopy(opt)
+        new_opt.nfc = int(new_nfc * opt.nfc  / opt.nfc_init )
+        new_opt.min_nfc = int( new_nfc * opt.nfc  / opt.min_nfc_init )
+        D_curr,G_curr = init_models(new_opt, opt)
         # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
         if (nfc_prev==opt.nfc):
             G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)))
@@ -336,20 +340,19 @@ def train_paint(opt,Gs,Zs,reals,NoiseAmp,centers,paint_inject_scale):
     return
 
 
-def init_models(opt):
-
+def init_models(new_opt, opt):\
     #generator initialization:
-    netG = models.GeneratorConcatSkip2CleanAdd(opt).to(opt.device)
+    netG = models.GeneratorConcatSkip2CleanAdd(new_opt).to(new_opt.device)
     netG.apply(models.weights_init)
     if opt.netG != '':
         netG.load_state_dict(torch.load(opt.netG))
-    # print(netG)
+    print(netG)
 
     #discriminator initialization:
     netD = models.WDiscriminator(opt).to(opt.device)
     netD.apply(models.weights_init)
     if opt.netD != '':
         netD.load_state_dict(torch.load(opt.netD))
-    # print(netD)
+    print(netD)
 
     return netD, netG

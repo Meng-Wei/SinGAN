@@ -16,6 +16,8 @@ if __name__ == '__main__':
                         help='training the model using quantization', default=False)
     parser.add_argument('--prune', action='store_true', 
                         help='training the model using pruning', default=False)
+    parser.add_argument('--scratch', action='store_true', 
+                        help='training the model to fit the Laplacian Pyramid', default=False)
     #==========================
     # Modes including:
     # train
@@ -31,8 +33,8 @@ if __name__ == '__main__':
     # animation
     parser.add_argument('--mode', help='task to be done', default='train')
     opt = parser.parse_args()
-    if opt.pyramid:
-        from SinGAN.pyramid_training import *
+    if opt.scratch:
+        from SinGAN.scratch_training import *
     elif opt.quant:
         from SinGAN.quant_training import *
     elif opt.prune:
