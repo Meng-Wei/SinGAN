@@ -10,7 +10,6 @@ from SinGAN.imresize import imresize, imresize_to_shape
 from torch.utils.tensorboard import SummaryWriter
 import time
 
-
 def train(opt,Gs,Zs,reals,NoiseAmp):
     real_ = functions.read_image(opt)
     in_s = 0

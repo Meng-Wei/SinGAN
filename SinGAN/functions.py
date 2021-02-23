@@ -22,7 +22,7 @@ def read_image(opt):
     return np2torch(x)
 
 # De-norm and norm will change images
-# between [0, 1] and [-1, 1]
+# between [0, 1] to [-1, 1]
 def denorm(x):
     out = (x + 1) / 2
     return out.clamp(0, 1)
@@ -172,9 +172,6 @@ def np2torch(x,opt):
     if not(opt.not_cuda):
         x = move_to_gpu(x)
     x = x.type(torch.cuda.FloatTensor) if not(opt.not_cuda) else x.type(torch.FloatTensor)
-    # if opt.quant:
-    #     x = x.half()
-    #x = x.type(torch.FloatTensor)
     x = norm(x)
     return x
 

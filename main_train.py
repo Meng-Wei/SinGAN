@@ -2,7 +2,6 @@ from config import get_arguments
 from SinGAN.manipulate import *
 import SinGAN.functions as functions
 
-
 if __name__ == '__main__':
     parser = get_arguments()
     parser.add_argument('--input_dir', help='input image dir', default='Input/Images')
@@ -10,13 +9,15 @@ if __name__ == '__main__':
     #==========================
     parser.add_argument('--pyramid', action='store_true', 
                         help='training the model to fit the Laplacian Pyramid', default=False)
+    parser.add_argument('--prune', action='store_true', 
+                        help='training the model using pruning', default=False)
     parser.add_argument('--quant', action='store_true', 
                         help='training the model using quantization', default=False)
     parser.add_argument('--mix', action='store_true', 
-                        help='training the model using quantization', default=False)
-    parser.add_argument('--prune', action='store_true', 
-                        help='training the model using pruning', default=False)
+                        help='training the model using mixture', default=False)
     parser.add_argument('--scratch', action='store_true', 
+                        help='training the model using pruning from scratch', default=False)
+    parser.add_argument('--no_recons', action='store_true', 
                         help='training the model to fit the Laplacian Pyramid', default=False)
     #==========================
     # Modes including:
@@ -33,14 +34,17 @@ if __name__ == '__main__':
     # animation
     parser.add_argument('--mode', help='task to be done', default='train')
     opt = parser.parse_args()
-    if opt.scratch:
-        from SinGAN.scratch_training import *
+
+    if opt.prune:
+        from SinGAN.prune_training import *
     elif opt.quant:
         from SinGAN.quant_training import *
-    elif opt.prune:
-        from SinGAN.prune_training import *
     elif opt.mix:
         from SinGAN.mix_training import *
+    elif opt.scratch:
+        from SinGAN.scratch_training import *
+    elif opt.no_recons:
+        from SinGAN.no_training import *
     else:
         from SinGAN.training import *
 
@@ -61,6 +65,8 @@ if __name__ == '__main__':
     real = functions.read_image(opt)
     functions.adjust_scales2image(real, opt)
     train(opt, Gs, Zs, reals, NoiseAmp)
+
+    # Generating images
     # Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
     # torch.cuda.reset_max_memory_allocated()
     # memory = torch.cuda.max_memory_allocated()

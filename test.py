@@ -54,5 +54,6 @@ if __name__ == '__main__':
             pass
     real = functions.read_image(opt)
     functions.adjust_scales2image(real, opt)
-    train(opt, Gs, Zs, reals, NoiseAmp)
-    # Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
+    # train(opt, Gs, Zs, reals, NoiseAmp)
+    Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
+    
