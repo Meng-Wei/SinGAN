@@ -7,16 +7,6 @@ if __name__ == '__main__':
     parser.add_argument('--input_dir', help='input image dir', default='Input/Images')
     parser.add_argument('--input_name', help='input image name', required=True)
     #==========================
-    parser.add_argument('--pyramid', action='store_true', 
-                        help='training the model to fit the Laplacian Pyramid', default=False)
-    parser.add_argument('--prune', action='store_true', 
-                        help='training the model using pruning', default=False)
-    parser.add_argument('--quant', action='store_true', 
-                        help='training the model using quantization', default=False)
-    parser.add_argument('--mix', action='store_true', 
-                        help='training the model using mixture', default=False)
-    parser.add_argument('--scratch', action='store_true', 
-                        help='training the model using pruning from scratch', default=False)
     parser.add_argument('--no_recons', action='store_true', 
                         help='training the model to fit the Laplacian Pyramid', default=False)
     #==========================
@@ -35,15 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', help='task to be done', default='train')
     opt = parser.parse_args()
 
-    if opt.prune:
-        from SinGAN.prune_training import *
-    elif opt.quant:
-        from SinGAN.quant_training import *
-    elif opt.mix:
-        from SinGAN.mix_training import *
-    elif opt.scratch:
-        from SinGAN.scratch_training import *
-    elif opt.no_recons:
+    if opt.no_recons:
         from SinGAN.no_training import *
     else:
         from SinGAN.training import *
