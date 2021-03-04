@@ -6,7 +6,7 @@ def get_arguments():
     #parser.add_argument('--mode', help='task to be done', default='train')
     #workspace:
     parser.add_argument('--not_cuda', action='store_true', help='disables cuda', default=0)
-    
+
     #load, input, save configurations:
     parser.add_argument('--netG', default='', help="path to netG (to continue training)")
     parser.add_argument('--netD', default='', help="path to netD (to continue training)")
@@ -14,7 +14,7 @@ def get_arguments():
     parser.add_argument('--nc_z',type=int,help='noise # channels',default=3)
     parser.add_argument('--nc_im',type=int,help='image # channels',default=3)
     parser.add_argument('--out',help='output folder',default='Output')
-        
+
     #networks hyper parameters:
     parser.add_argument('--nfc', type=int, default=32)
     parser.add_argument('--min_nfc', type=int, default=32)
@@ -22,7 +22,7 @@ def get_arguments():
     parser.add_argument('--num_layer',type=int,help='number of layers',default=5)
     parser.add_argument('--stride',help='stride',default=1)
     parser.add_argument('--padd_size',type=int,help='net pad size',default=0)#math.floor(opt.ker_size/2)
-        
+
     #pyramid parameters:
     parser.add_argument('--scale_factor',type=float,help='pyramid scale factor',default=0.75)#pow(0.5,1/6))
     parser.add_argument('--noise_amp',type=float,help='addative noise cont weight',default=0.1)
@@ -40,5 +40,4 @@ def get_arguments():
     parser.add_argument('--lambda_grad',type=float, help='gradient penelty weight',default=0.1)
     parser.add_argument('--alpha',type=float, help='reconstruction loss weight',default=10)
 
-    
     return parser

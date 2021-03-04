@@ -26,16 +26,14 @@ def np2torch(x,opt):
         x = x[:,:,:,None]
         x = x.transpose((3, 2, 0, 1))/255
     else:
-        x = color.rgb2gray(x)
+        # x = color.rgb2gray(x)
+        x = x[:, :, 0]
         x = x[:,:,None,None]
-        x = x.transpose(3, 2, 0, 1)
+        x = x.transpose(3, 2, 0, 1)/255.
     x = torch.from_numpy(x)
     if not (opt.not_cuda):
         x = move_to_gpu(x)
     x = x.type(torch.cuda.FloatTensor) if not(opt.not_cuda) else x.type(torch.FloatTensor)
-    if opt.quant:
-        x = x.half()
-    #x = x.type(torch.cuda.FloatTensor)
     x = norm(x)
     return x
 

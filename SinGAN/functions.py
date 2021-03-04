@@ -7,6 +7,7 @@ import scipy.io as sio
 import math
 from skimage import io as img
 from skimage import color, morphology, filters
+from skimage.util import img_as_ubyte
 #from skimage import morphology
 #from skimage import filters
 from SinGAN.imresize import imresize
@@ -17,9 +18,9 @@ from sklearn.cluster import KMeans
 
 # custom weights initialization called on netG and netD
 
-def read_image(opt):
-    x = img.imread('%s%s' % (opt.input_img,opt.ref_image))
-    return np2torch(x)
+# def read_image(opt):
+#     x = img.imread('%s%s' % (opt.input_img,opt.ref_image))
+#     return np2torch(x)
 
 # De-norm and norm will change images
 # between [0, 1] to [-1, 1]
@@ -150,6 +151,7 @@ def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA, device):
 
 def read_image(opt):
     x = img.imread('%s/%s' % (opt.input_dir,opt.input_name))
+    x = img_as_ubyte(x)
     x = np2torch(x,opt)
     x = x[:,0:3,:,:]
     return x
@@ -167,7 +169,7 @@ def np2torch(x,opt):
     else:
         x = color.rgb2gray(x)
         x = x[:,:,None,None]
-        x = x.transpose(3, 2, 0, 1)
+        x = x.transpose(3, 2, 0, 1)/255.
     x = torch.from_numpy(x)
     if not(opt.not_cuda):
         x = move_to_gpu(x)
