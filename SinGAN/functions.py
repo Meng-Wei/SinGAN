@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 import torch.nn as nn
+import torchvision.transforms as transforms
 import scipy.io as sio
 import math
 from skimage import io as img
@@ -154,7 +155,28 @@ def read_image(opt):
     x = img_as_ubyte(x)
     x = np2torch(x,opt)
     x = x[:,0:3,:,:]
-    return x
+    ######### MARCH 14 random crop
+    _, _, h, w = x.shape
+    # if h > w:
+    #     start_h = random.randint(0, h - w)
+    #     end_h = start_h + w
+    #     return x[:, :, start_h:end_h, :]
+    # else:
+    #     start_w = random.randint(0, w - h)
+    #     end_w = start_w + h
+    #     return x[:, :, :, start_w:end_w]
+    memory_pixel = 890
+    start_h = random.randint(0, h - memory_pixel)
+    start_w = random.randint(0, w - memory_pixel)
+    return x[:, :, start_h:start_h+memory_pixel, start_w:start_w+memory_pixel]
+    # if h > w:
+    #     start_h = random.randint(0, h - w)
+    #     end_h = start_h + w
+    #     return x[:, :, start_h:end_h, :]
+    # else:
+    #     start_w = random.randint(0, w - h)
+    #     end_w = start_w + h
+    #     return x[:, :, :, start_w:end_w]
 
 def read_image_dir(dir,opt):
     x = img.imread('%s' % (dir))
