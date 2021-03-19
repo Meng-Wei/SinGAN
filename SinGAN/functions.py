@@ -165,7 +165,7 @@ def read_image(opt):
     #     start_w = random.randint(0, w - h)
     #     end_w = start_w + h
     #     return x[:, :, :, start_w:end_w]
-    memory_pixel = 890
+    memory_pixel = opt.resolution
     start_h = random.randint(0, h - memory_pixel)
     start_w = random.randint(0, w - memory_pixel)
     return x[:, :, start_h:start_h+memory_pixel, start_w:start_w+memory_pixel]
