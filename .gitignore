@@ -9,3 +9,6 @@ ori_SinGAN
 */__pycache__/
 *.py[cod]
 *.DS_Store
+
+*.sh
+script
