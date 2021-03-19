@@ -12,6 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', help='random_samples | random_samples_arbitrary_sizes', default='train', required=True)
     # for random_samples:
     parser.add_argument('--gen_start_scale', type=int, help='generation start scale', default=0)
+    parser.add_argument('--num_samples', type=int, help='num of generation samples', default=100)
     # for random_samples_arbitrary_sizes:
     parser.add_argument('--scale_h', type=float, help='horizontal resize factor for random samples', default=1.5)
     parser.add_argument('--scale_v', type=float, help='vertical resize factor for random samples', default=1)
@@ -41,14 +42,14 @@ if __name__ == '__main__':
         functions.adjust_scales2image(real, opt)
         Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
         in_s = functions.generate_in2coarsest(reals,1,1,opt)
-        SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, gen_start_scale=opt.gen_start_scale)
+        SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, gen_start_scale=opt.gen_start_scale, num_samples=opt.num_samples)
 
     elif opt.mode == 'random_samples_arbitrary_sizes':
         real = functions.read_image(opt)
         functions.adjust_scales2image(real, opt)
         Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
         in_s = functions.generate_in2coarsest(reals,opt.scale_v,opt.scale_h,opt)
-        SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, in_s, scale_v=opt.scale_v, scale_h=opt.scale_h)
+        SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, in_s, scale_v=opt.scale_v, scale_h=opt.scale_h, num_samples=opt.num_samples)
 
 
 
