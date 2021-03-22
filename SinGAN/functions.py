@@ -152,9 +152,11 @@ def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA, device):
 
 def read_image(opt):
     x = img.imread('%s/%s' % (opt.input_dir,opt.input_name))
-    x = img_as_ubyte(x)
+    # x = img_as_ubyte(x)
     x = np2torch(x,opt)
-    x = x[:,0:3,:,:]
+    ######### MARCH 22 Hard code
+    x = x[:,0:3,-900:,-1200:]
+    print(x.shape)
     ######### MARCH 14 random crop
     _, _, h, w = x.shape
     # if h > w:
@@ -169,14 +171,6 @@ def read_image(opt):
     start_h = random.randint(0, h - memory_pixel)
     start_w = random.randint(0, w - memory_pixel)
     return x[:, :, start_h:start_h+memory_pixel, start_w:start_w+memory_pixel]
-    # if h > w:
-    #     start_h = random.randint(0, h - w)
-    #     end_h = start_h + w
-    #     return x[:, :, start_h:end_h, :]
-    # else:
-    #     start_w = random.randint(0, w - h)
-    #     end_w = start_w + h
-    #     return x[:, :, :, start_w:end_w]
 
 def read_image_dir(dir,opt):
     x = img.imread('%s' % (dir))
@@ -187,11 +181,17 @@ def read_image_dir(dir,opt):
 def np2torch(x,opt):
     if opt.nc_im == 3:
         x = x[:,:,:,None]
-        x = x.transpose((3, 2, 0, 1))/255
+        if 'tif' in opt.input_name:
+            x = x.transpose((3, 2, 0, 1))/65535.
+        else:
+            x = x.transpose((3, 2, 0, 1))/255.
     else:
         x = color.rgb2gray(x)
         x = x[:,:,None,None]
-        x = x.transpose(3, 2, 0, 1)/255.
+        if 'tif' in opt.input_name:
+            x = x.transpose(3, 2, 0, 1)/65535.
+        else:
+            x = x.transpose(3, 2, 0, 1)/255.
     x = torch.from_numpy(x)
     if not(opt.not_cuda):
         x = move_to_gpu(x)
@@ -236,17 +236,46 @@ def save_networks(netG,netD,z,opt):
 #     opt.stop_scale = opt.num_scales - scale2stop
 #     return real
 
+####### Before march 22
+# def adjust_scales2image(real_,opt):
+#     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
+#     # num_scales: how many levels of pyramids
+#     opt.num_scales = int((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init)))
+#     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
+#     # 1:0; 1/2:1; etc
+#     scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+#     # stop_scale: level to stop, since reach the maximum size.
+#     opt.stop_scale = opt.num_scales - scale2stop
+#     # scale1: for the largest patch size, what ratio wrt the image shape
+#     opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
+#     real = imresize(real_, opt.scale1, opt)
+#     # scale_factor:  evenly divide the scale_factor_init
+#     opt.scale_factor = opt.scale_factor_init
+#     # scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+#     # opt.stop_scale = opt.num_scales - scale2stop
+#     return real
+
+####### MARCH 22
 def adjust_scales2image(real_,opt):
     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
     # num_scales: how many levels of pyramids
-    opt.num_scales = int((math.log(math.pow(opt.min_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init)))
+    opt.intermediate_size = 160
+    opt.first_scale_factor = 0.5
+    opt.num_scales_1 = int((math.log(math.pow(opt.min_size / opt.intermediate_size, 1), opt.first_scale_factor)))
+    opt.num_scales_2 = int((math.log(math.pow(opt.intermediate_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init))) + 1
+    print(opt.num_scales_1, opt.num_scales_2)
+
     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
     # 1:0; 1/2:1; etc
-    scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    # Because we use the highest resolution, change max_size to preserve the finest details
+    # scale2stop = math.ceil(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    scale2stop = 0
     # stop_scale: level to stop, since reach the maximum size.
-    opt.stop_scale = opt.num_scales - scale2stop
+    opt.stop_scale = opt.num_scales_1 + opt.num_scales_2 - scale2stop
+
     # scale1: for the largest patch size, what ratio wrt the image shape
-    opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
+    opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)
+    print(opt.scale1)
     real = imresize(real_, opt.scale1, opt)
     # scale_factor:  evenly divide the scale_factor_init
     opt.scale_factor = opt.scale_factor_init
@@ -267,12 +296,33 @@ def adjust_scales2image_SR(real_,opt):
     opt.stop_scale = opt.num_scales - scale2stop
     return real
 
+####### Before march 22
+# def creat_reals_pyramid(real,reals,opt):
+#     real = real[:,0:3,:,:]
+#     for i in range(0,opt.stop_scale+1,1):
+#         scale = math.pow(opt.scale_factor,opt.num_scales-i)
+#         curr_real = imresize(real,scale,opt)
+#         reals.append(curr_real)
+#     return reals
+
+####### MARCH 22
 def creat_reals_pyramid(real,reals,opt):
     real = real[:,0:3,:,:]
-    for i in range(0,opt.stop_scale+1,1):
-        scale = math.pow(opt.scale_factor,opt.num_scales-i)
+    for i in range(0,opt.num_scales_2+1,1):
+        scale = math.pow(opt.scale_factor,opt.num_scales_2-i)
         curr_real = imresize(real,scale,opt)
+        # print(curr_real.shape)
         reals.append(curr_real)
+
+    intermediate_real = reals[0]
+    for i in range(0,opt.num_scales_1,1):
+        scale = math.pow(opt.first_scale_factor,opt.num_scales_1-i)
+        curr_real = imresize(intermediate_real,scale,opt)
+        # print(curr_real.shape)
+        reals.insert(i, curr_real)
+
+    for i in reals:
+        print(i.shape)
     return reals
 
 

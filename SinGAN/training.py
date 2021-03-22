@@ -22,6 +22,8 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
     # Train including opt.stop_scale
     while cur_scale_level < opt.stop_scale+1:
+        if reals[cur_scale_level].shape[0] > opt.intermediate_size:
+            break
     # while cur_scale_level < 1:
         # nfc: number of out channels in conv block
         opt.nfc = min(opt.nfc_init * pow(2, math.floor(cur_scale_level / 4)), 128)
@@ -283,7 +285,14 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = m_image(G_z)
                 z_in = noise_amp*z+G_z
                 G_z = G(z_in.detach(),G_z)
-                G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # Previous:
+                # G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # Now:
+                if real_curr.shape[2] < opt.intermediate_size:
+                    G_z = imresize(G_z,1/opt.first_scale_factor,opt)
+                else:
+                    G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # end now
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 count += 1
         if mode == 'rec':
@@ -293,7 +302,14 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 G_z = m_image(G_z)
                 z_in = noise_amp*Z_opt+G_z
                 G_z = G(z_in.detach(),G_z)
-                G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # Previous:
+                # G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # Now:
+                if real_curr.shape[2] < opt.intermediate_size:
+                    G_z = imresize(G_z,1/opt.first_scale_factor,opt)
+                else:
+                    G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # end now
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 #if count != (len(Gs)-1):
                 #    G_z = m_image(G_z)
