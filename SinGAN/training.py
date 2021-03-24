@@ -22,7 +22,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
     # Train including opt.stop_scale
     while cur_scale_level < opt.stop_scale+1:
-        if reals[cur_scale_level].shape[0] > opt.intermediate_size:
+        if reals[cur_scale_level].shape[2] > 240:
             break
     # while cur_scale_level < 1:
         # nfc: number of out channels in conv block
