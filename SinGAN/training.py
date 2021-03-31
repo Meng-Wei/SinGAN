@@ -48,13 +48,19 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
             plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[cur_scale_level]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
+        if os.path.exists('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)):
+            print('exist')
+            continue
+        else:
+            print('not')
+            continue
         # Notice, as the level increases, the architecture of CNN block might differ. (every 4 levels according to the paper)
         if (nfc_prev==opt.nfc):
             G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,cur_scale_level-1)))
             D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,cur_scale_level-1)))
 
         # in_s: guess: initial signal? it doesn't change during the training, and is a zero tensor.
-        z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt)
+        # z_curr, in_s, G_curr = train_single_scale(D_curr, G_curr, reals, Gs, Zs, in_s, NoiseAmp, opt)
 
         G_curr = functions.reset_grads(G_curr,False)
         G_curr.eval()
@@ -65,10 +71,10 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         Zs.append(z_curr)
         NoiseAmp.append(opt.noise_amp)
 
-        torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-        torch.save(Gs, '%s/Gs.pth' % (opt.out_))
-        torch.save(reals, '%s/reals.pth' % (opt.out_))
-        torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
+        # torch.save(Zs, '%s/Zs.pth' % (opt.out_))
+        # torch.save(Gs, '%s/Gs.pth' % (opt.out_))
+        # torch.save(reals, '%s/reals.pth' % (opt.out_))
+        # torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
 
         cur_scale_level+=1
         nfc_prev = opt.nfc
