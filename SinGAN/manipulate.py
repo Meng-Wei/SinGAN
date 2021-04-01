@@ -21,7 +21,6 @@ from SinGAN.training import *
 from config import get_arguments
 
 def generate_gif(Gs,Zs,reals,NoiseAmp,opt,alpha=0.1,beta=0.9,start_scale=2,fps=10):
-
     in_s = torch.full(Zs[0].shape, 0, device=opt.device)
     images_cur = []
     count = 0

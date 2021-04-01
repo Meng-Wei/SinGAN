@@ -21,11 +21,18 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     nfc_prev = 0
 
     # Train including opt.stop_scale
+    opt.out_ = functions.generate_dir2save(opt)
     if os.path.exists('%s/Gs.pth' % (opt.out_)):
-        Zs = torch.load('%s/Zs.pth' % (opt.out_), map_location='cpu')
-        Gs = torch.load('%s/Gs.pth' % (opt.out_), map_location='cpu')
-        NoiseAmp = torch.load('%s/NoiseAmp.pth' % (opt.out_), map_location='cpu')
+        real = reals[len(Gs)]
+        opt.nzx = real.shape[2]#+(opt.ker_size-1)*(opt.num_layer)
+        opt.nzy = real.shape[3]#+(opt.ker_size-1)*(opt.num_layer)
+        Zs = torch.load('%s/Zs.pth' % (opt.out_))
+        Gs = torch.load('%s/Gs.pth' % (opt.out_))
+        NoiseAmp = torch.load('%s/NoiseAmp.pth' % (opt.out_))
+        reals = torch.load('%s/reals.pth' % (opt.out_))
+        in_s = torch.full([1,opt.nc_z,opt.nzx,opt.nzy], 0, device=opt.device)
 
+    print(len(Gs), len(Zs), len(NoiseAmp))
     cur_scale_level = len(Zs)
     while cur_scale_level < opt.stop_scale+1:
         # if reals[cur_scale_level].shape[2] > 240:
