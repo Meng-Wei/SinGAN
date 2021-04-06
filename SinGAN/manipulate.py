@@ -4,7 +4,7 @@ import SinGAN.models
 import argparse
 import os
 import random
-from SinGAN.imresize import imresize
+from SinGAN.imresize import imresize, imresize_to_shape
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
@@ -99,13 +99,14 @@ def SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt,in_s=None,scale_v=1,scale_h=1,n=0,g
         images_prev = images_cur
         images_cur = []
 
+        batch_size = 5
         for i in range(0,num_samples,1):
             if n == 0:
-                z_curr = functions.generate_noise([1,nzx,nzy], device=opt.device)
-                z_curr = z_curr.expand(1,opt.nc_z,z_curr.shape[2],z_curr.shape[3])
+                z_curr = functions.generate_noise([opt.nc_z,nzx,nzy], num_samp=batch_size, device=opt.device)
+                z_curr = z_curr.expand(batch_size,opt.nc_z,z_curr.shape[2],z_curr.shape[3])
                 z_curr = m(z_curr)
             else:
-                z_curr = functions.generate_noise([opt.nc_z,nzx,nzy], device=opt.device)
+                z_curr = functions.generate_noise([opt.nc_z,nzx,nzy], num_samp=batch_size, device=opt.device)
                 z_curr = m(z_curr)
 
             if images_prev == []:
@@ -134,8 +135,7 @@ def SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt,in_s=None,scale_v=1,scale_h=1,n=0,g
             z_in = noise_amp*(z_curr)+I_prev
             I_curr = G(z_in.detach(),I_prev)
 
-            # if n == len(reals)-1:
-            if n == 4:
+            if n == len(reals)-1:
                 if opt.mode == 'train':
                     dir2save = '%s/RandomSamples/%s/gen_start_scale=%d' % (opt.out, opt.input_name[:-4], gen_start_scale)
                 else:
@@ -147,10 +147,13 @@ def SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt,in_s=None,scale_v=1,scale_h=1,n=0,g
                 if (opt.mode != "harmonization") & (opt.mode != "editing") & (opt.mode != "SR") & (opt.mode != "paint2image"):
                     # cur_img = functions.convert_image_np(I_curr.detach())
                     # print(cur_img.shape, np.max(cur_img), np.min(cur_img))
-                    if opt.nc_im == 1:
-                        plt.imsave('%s/%d.png' % (dir2save, i), functions.convert_image_np(I_curr.detach()), vmin=0,vmax=1, cmap='gray')
-                    else:
-                        plt.imsave('%s/%d.png' % (dir2save, i), functions.convert_image_np(I_curr.detach()), vmin=0,vmax=1)
+                    for j in range(batch_size):
+                        if opt.nc_im == 1:
+                            I_curr_j = imresize_to_shape(I_curr[j][np.newaxis ,...], [160,160], opt)
+                            plt.imsave('%s/%d.png' % (dir2save, i*batch_size+j), functions.convert_image_np(I_curr_j), vmin=0,vmax=1, cmap='gray')
+                        else:
+                            I_curr_j = imresize_to_shape(I_curr[j][np.newaxis ,...], [160,160,3], opt)
+                            plt.imsave('%s/%d.png' % (dir2save, i*batch_size+j), functions.convert_image_np(I_curr_j), vmin=0,vmax=1)
                     #plt.imsave('%s/%d_%d.png' % (dir2save,i,n),functions.convert_image_np(I_curr.detach()), vmin=0, vmax=1)
                     #plt.imsave('%s/in_s.png' % (dir2save), functions.convert_image_np(in_s), vmin=0,vmax=1)
             images_cur.append(I_curr)
