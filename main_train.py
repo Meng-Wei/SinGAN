@@ -8,7 +8,9 @@ if __name__ == '__main__':
     parser.add_argument('--input_name', help='input image name', required=True)
     #==========================
     parser.add_argument('--no_recons', action='store_true', 
-                        help='training the model to fit the Laplacian Pyramid', default=False)
+                        help='training the model without reconstruction error', default=False)
+    parser.add_argument('--config_a', action='store_true', 
+                        help='training the model with configuration a', default=False)
     #==========================
     # Modes including:
     # train
@@ -27,6 +29,8 @@ if __name__ == '__main__':
 
     if opt.no_recons:
         from SinGAN.no_training import *
+    elif opt.config_a:
+        from SinGAN.training_a import *
     else:
         from SinGAN.training import *
 

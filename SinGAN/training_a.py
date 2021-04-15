@@ -122,7 +122,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     errG2plot = []
     D_real2plot = []
     D_fake2plot = []
-    # z_opt2plot = []
+    z_opt2plot = []
 
     for epoch in range(opt.niter):
         start_time = time.time()
@@ -161,18 +161,17 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                     prev = torch.full([1,opt.nc_z,opt.nzx,opt.nzy], 0, device=opt.device)
                     in_s = prev
                     prev = m_image(prev)
-                    # z_prev = torch.full([1,opt.nc_z,opt.nzx,opt.nzy], 0, device=opt.device)
-                    # z_prev = m_noise(z_prev)
+                    z_prev = torch.full([1,opt.nc_z,opt.nzx,opt.nzy], 0, device=opt.device)
+                    z_prev = m_noise(z_prev)
                     opt.noise_amp = 1
                 else:
                     prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rand',m_noise,m_image,opt)
                     prev = m_image(prev)
-                    # z_prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rec',m_noise,m_image,opt)
-                    # criterion = nn.MSELoss()
-                    # RMSE = torch.sqrt(criterion(real, z_prev))
-                    # z_prev = m_image(z_prev)
-                    # opt.noise_amp = opt.noise_amp_init*RMSE
-                    opt.noise_amp = opt.noise_amp_init
+                    z_prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rec',m_noise,m_image,opt)
+                    criterion = nn.MSELoss()
+                    RMSE = torch.sqrt(criterion(real, z_prev))
+                    opt.noise_amp = opt.noise_amp_init*RMSE
+                    z_prev = m_image(z_prev)
             else:
                 prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rand',m_noise,m_image,opt)
                 prev = m_image(prev)
@@ -210,13 +209,22 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             #D_fake_map = output.detach()
             errG = -output.mean()
             errG.backward(retain_graph=True)
+            if alpha!=0:
+                loss = nn.MSELoss()
+                Z_opt = opt.noise_amp*z_opt+z_prev
+                rec_loss = alpha*loss(netG(Z_opt.detach(),z_prev),real)
+                rec_loss.backward(retain_graph=True)
+                rec_loss = rec_loss.detach()
+            else:
+                Z_opt = z_opt
+                rec_loss = 0
+
             optimizerG.step()
 
-        # errG2plot.append(errG.detach()+rec_loss)
-        errG2plot.append(errG.detach())
+        errG2plot.append(errG.detach()+rec_loss)
         D_real2plot.append(D_x)
         D_fake2plot.append(D_G_z)
-        # z_opt2plot.append(rec_loss)
+        z_opt2plot.append(rec_loss)
 
         if epoch > 1 and (epoch % 100 == 0 or epoch == (opt.niter-1)):
             total_time = time.time() - start_time
@@ -239,7 +247,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                 plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1, cmap='gray')
                 # plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1, cmap='gray')
                 # plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1, cmap='gray')
-                # plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1, cmap='gray')
+                plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1, cmap='gray')
                 # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
                 # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
                 torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
@@ -249,7 +257,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                 plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
                 # plt.imsave('%s/z_opt.png'    % (opt.outf), functions.convert_image_np(z_opt.detach()), vmin=0, vmax=1)
                 # plt.imsave('%s/z_prev.png'   % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
-                # plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
+                plt.imsave('%s/G(z_opt).png'    % (opt.outf),  functions.convert_image_np(netG(Z_opt.detach(), z_prev).detach()), vmin=0, vmax=1)
                 # plt.imsave('%s/D_fake.png'   % (opt.outf), functions.convert_image_np(D_fake_map))
                 # plt.imsave('%s/D_real.png'   % (opt.outf), functions.convert_image_np(D_real_map))
                 torch.save(z_opt, '%s/z_opt.pth' % (opt.outf))
@@ -260,10 +268,10 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
             plt.legend(loc="best")
             plt.savefig('%s/error.png' % (opt.outf))
             plt.close()
-            # plt.plot(np.arange(epoch+1), z_opt2plot, label='rec loss')
-            # plt.legend(loc="best")
-            # plt.savefig('%s/rec_loss.png' % (opt.outf))
-            # plt.close()
+            plt.plot(np.arange(epoch+1), z_opt2plot, label='rec loss')
+            plt.legend(loc="best")
+            plt.savefig('%s/rec_loss.png' % (opt.outf))
+            plt.close()
 
         schedulerD.step()
         schedulerG.step()
@@ -300,35 +308,25 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 # end now
                 G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
                 count += 1
-        #         # Previous:
-        #         # G_z = imresize(G_z,1/opt.scale_factor,opt)
-        #         # Now:
-        #         if real_curr.shape[2] < opt.intermediate_size:
-        #             G_z = imresize(G_z,1/opt.first_scale_factor,opt)
-        #         else:
-        #             G_z = imresize(G_z,1/opt.scale_factor,opt)
-        #         # end now
-        #         G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
-        #         count += 1
-        # if mode == 'rec':
-        #     count = 0
-        #     for G,Z_opt,real_curr,real_next,noise_amp in zip(Gs,Zs,reals,reals[1:],NoiseAmp):
-        #         G_z = G_z[:, :, 0:real_curr.shape[2], 0:real_curr.shape[3]]
-        #         G_z = m_image(G_z)
-        #         z_in = noise_amp*Z_opt+G_z
-        #         G_z = G(z_in.detach(),G_z)
-        #         # Previous:
-        #         # G_z = imresize(G_z,1/opt.scale_factor,opt)
-        #         # Now:
-        #         if real_curr.shape[2] < opt.intermediate_size:
-        #             G_z = imresize(G_z,1/opt.first_scale_factor,opt)
-        #         else:
-        #             G_z = imresize(G_z,1/opt.scale_factor,opt)
-        #         # end now
-        #         G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
-        #         #if count != (len(Gs)-1):
-        #         #    G_z = m_image(G_z)
-        #         count += 1
+        if mode == 'rec':
+            count = 0
+            for G,Z_opt,real_curr,real_next,noise_amp in zip(Gs,Zs,reals,reals[1:],NoiseAmp):
+                G_z = G_z[:, :, 0:real_curr.shape[2], 0:real_curr.shape[3]]
+                G_z = m_image(G_z)
+                z_in = noise_amp*Z_opt+G_z
+                G_z = G(z_in.detach(),G_z)
+                # Previous:
+                # G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # Now:
+                if real_curr.shape[2] < opt.intermediate_size:
+                    G_z = imresize(G_z,1/opt.first_scale_factor,opt)
+                else:
+                    G_z = imresize(G_z,1/opt.scale_factor,opt)
+                # end now
+                G_z = G_z[:,:,0:real_next.shape[2],0:real_next.shape[3]]
+                #if count != (len(Gs)-1):
+                #    G_z = m_image(G_z)
+                count += 1
     return G_z
 
 def init_models(opt):
