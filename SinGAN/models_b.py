@@ -18,7 +18,7 @@ def weights_init(m):
     elif classname.find('Norm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
-   
+
 class WDiscriminator(nn.Module):
     def __init__(self, opt):
         super(WDiscriminator, self).__init__()
@@ -33,13 +33,13 @@ class WDiscriminator(nn.Module):
         self.tail = nn.Conv2d(max(N,opt.min_nfc),1,kernel_size=opt.ker_size,stride=1,padding=opt.padd_size)
 
     def forward(self,x):
-        # print("ds input", x.shape)
+        # print("ds input", x.shape) # N x c x height x width
         x = self.head(x)
         # print("ds head", x.shape)
         x = self.body(x)
         # print("ds body", x.shape)
         x = self.tail(x)
-        # print("ds tail", x.shape)
+        # print("ds tail", x.shape) # N x 1 x num_of_patches x nop
         return x
 
 
@@ -58,14 +58,12 @@ class GeneratorConcatSkip2CleanAdd(nn.Module):
             nn.Conv2d(max(N,opt.min_nfc),opt.nc_im,kernel_size=opt.ker_size,stride =1,padding=opt.padd_size),
             nn.Tanh()
         )
-        self.tanh = nn.Tanh()
-
     def forward(self,x,y):
         # x: noise + previous image
         # y: previous image
         x = self.head(x)
         x = self.body(x)
         x = self.tail(x)
-        ind = int((y.shape[2]-x.shape[2])/2)
-        y = y[:,:,ind:(y.shape[2]-ind),ind:(y.shape[3]-ind)]
-        return self.tanh(x+y)
+        # ind = int((y.shape[2]-x.shape[2])/2)
+        # y = y[:,:,ind:(y.shape[2]-ind),ind:(y.shape[3]-ind)]
+        return x

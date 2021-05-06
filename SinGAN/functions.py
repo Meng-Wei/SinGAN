@@ -156,7 +156,7 @@ def read_image(opt):
     x = np2torch(x,opt)
     ######### MARCH 22 Hard code
     x = x[:,0:3,-900:,-1200:]
-    print(x.shape)
+    print('input image shape', x.shape)
     ######### MARCH 14 random crop
     _, _, h, w = x.shape
     # if h > w:
@@ -259,10 +259,8 @@ def save_networks(netG,netD,z,opt):
 def adjust_scales2image(real_,opt):
     #opt.num_scales = int((math.log(math.pow(opt.min_size / (real_.shape[2]), 1), opt.scale_factor_init))) + 1
     # num_scales: how many levels of pyramids
-    opt.intermediate_size = 160
-    opt.first_scale_factor = 0.5
     opt.num_scales_1 = int((math.log(math.pow(opt.min_size / opt.intermediate_size, 1), opt.first_scale_factor)))
-    opt.num_scales_2 = int((math.log(math.pow(opt.intermediate_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init))) + 1
+    opt.num_scales_2 = math.ceil((math.log(math.pow(opt.intermediate_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init)))
     print(opt.num_scales_1, opt.num_scales_2)
 
     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
@@ -275,7 +273,6 @@ def adjust_scales2image(real_,opt):
 
     # scale1: for the largest patch size, what ratio wrt the image shape
     opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)
-    print(opt.scale1)
     real = imresize(real_, opt.scale1, opt)
     # scale_factor:  evenly divide the scale_factor_init
     opt.scale_factor = opt.scale_factor_init
@@ -310,19 +307,20 @@ def creat_reals_pyramid(real,reals,opt):
     real = real[:,0:3,:,:]
     for i in range(0,opt.num_scales_2+1,1):
         scale = math.pow(opt.scale_factor,opt.num_scales_2-i)
+        print(opt.num_scales_2-i)
         curr_real = imresize(real,scale,opt)
-        # print(curr_real.shape)
+        print(curr_real.shape)
         reals.append(curr_real)
 
     intermediate_real = reals[0]
     for i in range(0,opt.num_scales_1,1):
         scale = math.pow(opt.first_scale_factor,opt.num_scales_1-i)
         curr_real = imresize(intermediate_real,scale,opt)
-        # print(curr_real.shape)
+        print(curr_real.shape)
         reals.insert(i, curr_real)
 
-    for i in reals:
-        print(i.shape)
+    # for i in reals:
+    #     print(i.shape)
     return reals
 
 

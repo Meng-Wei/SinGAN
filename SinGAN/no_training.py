@@ -31,9 +31,9 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         NoiseAmp = torch.load('%s/NoiseAmp.pth' % (opt.out_))
         reals = torch.load('%s/reals.pth' % (opt.out_))
         in_s = torch.full([1,opt.nc_z,opt.nzx,opt.nzy], 0, device=opt.device)
-    print(len(Gs), len(Zs), len(NoiseAmp))
-    cur_scale_level = len(Zs)
+    print('previous trained level: ', len(Gs), len(Zs), len(NoiseAmp))
 
+    cur_scale_level = len(Zs)
     while cur_scale_level < opt.stop_scale+1:
         # if reals[cur_scale_level].shape[2] > 240:
         #     break
