@@ -68,6 +68,7 @@ class GeneratorConcatSkip2CleanAdd(nn.Module):
         ind = int((y.shape[2]-x.shape[2])/2)
         y = y[:,:,ind:(y.shape[2]-ind),ind:(y.shape[3]-ind)]
         return x+y
+        # return torch.tanh(x+y)
 
 # class TransConvBlock(nn.Sequential):
 #     def __init__(self, in_channel, out_channel, ker_size, padd, stride):

@@ -57,6 +57,16 @@ def convert_image_np(inp):
     inp = np.clip(inp,0,1)
     return inp
 
+def convert_image_np_decompose(inp, i):
+    inp = denorm(inp)
+    inp = move_to_cpu(inp[-1,i,:,:])
+    inp = inp.numpy().transpose((0,1))
+    # mean = np.array([x/255.0 for x in [125.3,123.0,113.9]])
+    # std = np.array([x/255.0 for x in [63.0,62.1,66.7]])
+
+    inp = np.clip(inp,0,1)
+    return inp
+
 def save_image(real_cpu,receptive_feild,ncs,epoch_num,file_name):
     fig,ax = plt.subplots(1)
     if ncs==1:
@@ -172,6 +182,39 @@ def read_image(opt):
     start_w = random.randint(0, w - memory_pixel)
     return x[:, :, start_h:start_h+memory_pixel, start_w:start_w+memory_pixel]
 
+def read_image_decompose(opt):
+    s1a = img.imread('%s/s1a.png' % (opt.input_dir))
+    s2a = img.imread('%s/s2a.png' % (opt.input_dir))
+    s3a = img.imread('%s/s3a.png' % (opt.input_dir))
+
+    s1b = img.imread('%s/s1b.png' % (opt.input_dir))
+    s2b = img.imread('%s/s2b.png' % (opt.input_dir))
+    s3b = img.imread('%s/s3b.png' % (opt.input_dir))
+
+    s1c = img.imread('%s/s1c.png' % (opt.input_dir))
+    s2c = img.imread('%s/s2c.png' % (opt.input_dir))
+    s3c = img.imread('%s/s3c.png' % (opt.input_dir))
+
+
+    x = np.stack([s1a, s2a, s3a, s1b, s2b, s3b, s1c, s2c, s3c], axis=2)
+    x = np2torch(x,opt)
+    print('input image shape', x.shape, 'max', x.max(), 'min', x.min())
+    return x
+
+    # s1a= np2torch(s1a,opt)
+    # s2a= np2torch(s2a,opt)
+    # s3a= np2torch(s3a,opt)
+
+    # s1b= np2torch(s1b,opt)
+    # s2b= np2torch(s2b,opt)
+    # s3b= np2torch(s3b,opt)
+
+    # s1c= np2torch(s1c,opt)
+    # s2c= np2torch(s2c,opt)
+    # s3c= np2torch(s3c,opt)
+
+    # print('s1a, s2a shape', s1a.shape, s2a.shape)
+
 def read_image_dir(dir,opt):
     x = img.imread('%s' % (dir))
     x = np2torch(x,opt)
@@ -179,19 +222,19 @@ def read_image_dir(dir,opt):
     return x
 
 def np2torch(x,opt):
-    if opt.nc_im == 3:
-        x = x[:,:,:,None]
-        if 'tif' in opt.input_name:
-            x = x.transpose((3, 2, 0, 1))/65535.
-        else:
-            x = x.transpose((3, 2, 0, 1))/255.
-    else:
+    if opt.nc_im == 1:
         x = color.rgb2gray(x)
         x = x[:,:,None,None]
         if 'tif' in opt.input_name:
             x = x.transpose(3, 2, 0, 1)/65535.
         else:
             x = x.transpose(3, 2, 0, 1)/255.
+    else:
+        x = x[:,:,:,None]
+        if 'tif' in opt.input_name:
+            x = x.transpose((3, 2, 0, 1))/65535.
+        else:
+            x = x.transpose((3, 2, 0, 1))/255.
     x = torch.from_numpy(x)
     if not(opt.not_cuda):
         x = move_to_gpu(x)
@@ -261,7 +304,8 @@ def adjust_scales2image(real_,opt):
     # num_scales: how many levels of pyramids
     opt.num_scales_1 = int((math.log(math.pow(opt.min_size / opt.intermediate_size, 1), opt.first_scale_factor)))
     opt.num_scales_2 = math.ceil((math.log(math.pow(opt.intermediate_size / (min(real_.shape[2], real_.shape[3])), 1), opt.scale_factor_init)))
-    print(opt.num_scales_1, opt.num_scales_2)
+    print('Low levels:', opt.num_scales_1)
+    print('Upper levels:', opt.num_scales_2 + 1)
 
     # scale2stop: for the largest patch size, what ratio wrt the image shape in terms of scaler_factor_init
     # 1:0; 1/2:1; etc
@@ -304,19 +348,19 @@ def adjust_scales2image_SR(real_,opt):
 
 ####### MARCH 22
 def creat_reals_pyramid(real,reals,opt):
-    real = real[:,0:3,:,:]
+    real = real[:,:,:,:]
+    print('real shape: ', real.shape)
     for i in range(0,opt.num_scales_2+1,1):
         scale = math.pow(opt.scale_factor,opt.num_scales_2-i)
-        print(opt.num_scales_2-i)
         curr_real = imresize(real,scale,opt)
-        print(curr_real.shape)
+        print('level ', opt.num_scales_2-i, 'shape', curr_real.shape)
         reals.append(curr_real)
 
     intermediate_real = reals[0]
     for i in range(0,opt.num_scales_1,1):
         scale = math.pow(opt.first_scale_factor,opt.num_scales_1-i)
         curr_real = imresize(intermediate_real,scale,opt)
-        print(curr_real.shape)
+        print('level ', opt.num_scales_2+opt.num_scales_1-i,'shape', curr_real.shape)
         reals.insert(i, curr_real)
 
     # for i in reals:

@@ -22,16 +22,21 @@ def move_to_gpu(t):
     return t
 
 def np2torch(x,opt):
-    if opt.nc_im == 3:
-        x = x[:,:,:,None]
-        x = x.transpose((3, 2, 0, 1))/255
-    else:
-        # x = color.rgb2gray(x)
-        x = x[:, :, 0]
+    if opt.nc_im == 1:
+        x = color.rgb2gray(x)
         x = x[:,:,None,None]
-        x = x.transpose(3, 2, 0, 1)/255.
+        if 'tif' in opt.input_name:
+            x = x.transpose(3, 2, 0, 1)/65535.
+        else:
+            x = x.transpose(3, 2, 0, 1)/255.
+    else:
+        x = x[:,:,:,None]
+        if 'tif' in opt.input_name:
+            x = x.transpose((3, 2, 0, 1))/65535.
+        else:
+            x = x.transpose((3, 2, 0, 1))/255.
     x = torch.from_numpy(x)
-    if not (opt.not_cuda):
+    if not(opt.not_cuda):
         x = move_to_gpu(x)
     x = x.type(torch.cuda.FloatTensor) if not(opt.not_cuda) else x.type(torch.FloatTensor)
     x = norm(x)
